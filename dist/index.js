@@ -25650,6 +25650,24 @@ module.exports = {
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Card = void 0;
+const BASE_ANIMATIONS = `
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes scaleIn {
+    from { transform: translate(-5px, 5px) scale(0); }
+    to { transform: translate(-5px, 5px) scale(1); }
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes rankAnim {
+    from { stroke-dashoffset: 251.2; }
+    to { stroke-dashoffset: var(--progress-offset); }
+  }
+`;
 class Card {
     width;
     height;
@@ -25658,7 +25676,7 @@ class Card {
     title;
     hideBorder;
     hideTitle;
-    css;
+    extraCSS;
     paddingX;
     paddingY;
     animations;
@@ -25670,7 +25688,7 @@ class Card {
         this.title = opts.title || "";
         this.hideBorder = false;
         this.hideTitle = false;
-        this.css = "";
+        this.extraCSS = "";
         this.paddingX = 25;
         this.paddingY = 35;
         this.animations = true;
@@ -25684,18 +25702,30 @@ class Card {
             this.height -= 30;
     }
     setCSS(css) {
-        this.css = css;
+        this.extraCSS = css;
     }
     disableAnimations() {
         this.animations = false;
     }
     render(body) {
+        const header = this.hideTitle
+            ? ""
+            : `<text
+            class="header"
+            x="${this.paddingX}"
+            y="${this.paddingY}"
+            data-testid="header"
+          >${this.title}</text>`;
+        const noAnim = this.animations
+            ? ""
+            : "* { animation-duration: 0s !important; animation-delay: 0s !important; }";
         return `<svg
       width="${this.width}"
       height="${this.height}"
       viewBox="0 0 ${this.width} ${this.height}"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      role="img"
     >
       <style>
         .header {
@@ -25703,22 +25733,9 @@ class Card {
           fill: #${this.colors.titleColor};
           animation: fadeIn 0.8s ease-in-out forwards;
         }
-        ${this.css}
-        ${this.animations
-            ? ""
-            : "* { animation-duration: 0s !important; animation-delay: 0s !important; }"}
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes scaleIn {
-          from { transform: translate(-5px, 5px) scale(0); }
-          to { transform: translate(-5px, 5px) scale(1); }
-        }
-        @keyframes slideIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
+        ${this.extraCSS}
+        ${BASE_ANIMATIONS}
+        ${noAnim}
       </style>
 
       <rect
@@ -25732,11 +25749,7 @@ class Card {
         stroke-opacity="${this.hideBorder ? 0 : 1}"
       />
 
-      ${this.hideTitle
-            ? ""
-            : `<g transform="translate(${this.paddingX}, ${this.paddingY})">
-              <text class="header" data-testid="header">${this.title}</text>
-            </g>`}
+      ${header}
 
       <g
         transform="translate(0, ${this.hideTitle ? this.paddingX : this.paddingY + 20})"
@@ -25778,33 +25791,36 @@ const LEVEL_COLORS = {
 function renderContributionGraph(data, theme, _options) {
     const isDarkBg = isDark(theme.bg_color);
     const colors = isDarkBg ? LEVEL_COLORS.dark : LEVEL_COLORS.light;
-    const cellSize = 11;
-    const cellGap = 3;
+    const cellSize = 10;
+    const cellGap = 2;
     const cellStep = cellSize + cellGap;
     const weeks = data.weeks;
     const totalWeeks = weeks.length;
-    const graphWidth = totalWeeks * cellStep + 10;
-    const graphHeight = 7 * cellStep + 10;
-    const labelHeight = 20;
-    const cardWidth = Math.max(graphWidth + 50, 320);
-    const cardHeight = graphHeight + labelHeight + 70;
+    const graphWidth = totalWeeks * cellStep + 5;
+    const graphHeight = 7 * cellStep + 5;
+    const leftPadding = 35;
+    const topPadding = 25;
+    const cardWidth = Math.max(graphWidth + leftPadding + 25, 340);
+    const cardHeight = graphHeight + topPadding + 55;
     const css = `
-    .cell {
-      rx: 2;
-    }
+    .cell { rx: 2; }
     .month-label {
-      font: 400 10px 'Segoe UI', Ubuntu, Sans-Serif;
-      fill: #${theme.text_color};
-      opacity: 0.6;
-    }
-    .day-label {
       font: 400 10px 'Segoe UI', Ubuntu, Sans-Serif;
       fill: #${theme.text_color};
       opacity: 0.5;
     }
-    .total-label {
-      font: 600 13px 'Segoe UI', Ubuntu, Sans-Serif;
+    .day-label {
+      font: 400 9px 'Segoe UI', Ubuntu, Sans-Serif;
       fill: #${theme.text_color};
+      opacity: 0.4;
+    }
+    .total-text {
+      font: 600 12px 'Segoe UI', Ubuntu, Sans-Serif;
+      fill: #${theme.text_color};
+    }
+    .total-number {
+      font: 700 12px 'Segoe UI', Ubuntu, Sans-Serif;
+      fill: #${theme.title_color};
     }
   `;
     const card = new card_1.Card({
@@ -25820,22 +25836,23 @@ function renderContributionGraph(data, theme, _options) {
         title: "Contribution Graph",
     });
     card.setCSS(css);
+    card.setHideTitle(true);
     const cells = [];
     const monthLabels = [];
     const seenMonths = new Set();
-    const dayLabels = ["", "Mon", "", "Wed", "", "Fri", ""];
+    const dayLabels = ["Mon", "", "Wed", "", "Fri", ""];
     const dayLabelSvg = dayLabels
         .map((label, i) => {
         if (!label)
             return "";
-        return `<text class="day-label" x="0" y="${25 + i * cellStep + cellSize / 2 + 3}">${label}</text>`;
+        return `<text class="day-label" x="5" y="${topPadding + i * cellStep + cellSize - 1}">${label}</text>`;
     })
         .join("\n");
     for (let w = 0; w < weeks.length; w++) {
         const week = weeks[w];
         for (const day of week.contributionDays) {
-            const x = 30 + w * cellStep;
-            const y = 20 + day.weekday * cellStep;
+            const x = leftPadding + w * cellStep;
+            const y = topPadding + day.weekday * cellStep;
             const color = colors[day.contributionLevel] || colors.NONE;
             cells.push(`<rect class="cell" x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" fill="${color}" />`);
         }
@@ -25846,18 +25863,17 @@ function renderContributionGraph(data, theme, _options) {
             const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
             if (!seenMonths.has(monthKey)) {
                 seenMonths.add(monthKey);
-                monthLabels.push(`<text class="month-label" x="${30 + w * cellStep}" y="10">${monthName}</text>`);
+                monthLabels.push(`<text class="month-label" x="${leftPadding + w * cellStep}" y="12">${monthName}</text>`);
             }
         }
     }
-    const totalText = `<text class="total-label" x="25" y="${cardHeight - 15}">${data.totalContributions.toLocaleString()} contributions in the last year</text>`;
+    const totalY = topPadding + 7 * cellStep + 20;
+    const totalText = `<text class="total-text" x="${leftPadding}" y="${totalY}"><tspan class="total-number">${data.totalContributions.toLocaleString()}</tspan> contributions in the last year</text>`;
     return card.render(`
-    <svg x="0" y="0">
-      ${monthLabels.join("\n")}
-      ${dayLabelSvg}
-      ${cells.join("\n")}
-      ${totalText}
-    </svg>
+    ${monthLabels.join("\n")}
+    ${dayLabelSvg}
+    ${cells.join("\n")}
+    ${totalText}
   `);
 }
 function isDark(hexColor) {
@@ -25883,31 +25899,37 @@ const card_1 = __nccwpck_require__(8913);
 const rank_1 = __nccwpck_require__(3525);
 const icons_1 = __nccwpck_require__(1861);
 function kFormatter(n) {
+    if (n >= 1000000)
+        return (n / 1000000).toFixed(1) + "M";
     if (n >= 1000)
         return (n / 1000).toFixed(1) + "k";
     return n.toString();
 }
-function createTextNode(opts) {
-    const stagger = (opts.index + 3) * 150;
-    const displayValue = typeof opts.value === "number" ? kFormatter(opts.value) : opts.value;
-    const iconSvg = opts.showIcons
-        ? `<svg data-testid="icon" class="icon" viewBox="0 0 16 16" width="16" height="16" fill="#${opts.iconColor}">
-        ${opts.icon}
+function encodeHTML(str) {
+    return str.replace(/[\u00A0-\u9999<>&](?!#)/gim, (i) => {
+        return "&#" + i.charCodeAt(0) + ";";
+    });
+}
+const STAT_ITEMS = [
+    { key: "stars", icon: icons_1.icons.star, label: "Total Stars" },
+    { key: "commits", icon: icons_1.icons.commits, label: "Total Commits" },
+    { key: "prs", icon: icons_1.icons.prs, label: "Total PRs" },
+    { key: "issues", icon: icons_1.icons.issues, label: "Total Issues" },
+    { key: "contribs", icon: icons_1.icons.contribs, label: "Contributed to" },
+];
+function statRow(icon, label, value, index, showIcons, textColor, iconColor) {
+    const delay = (index + 1) * 150;
+    const y = index * 25;
+    const iconSvg = showIcons
+        ? `<svg class="stat-icon" viewBox="0 0 16 16" width="16" height="16" fill="#${iconColor}">
+        ${icon}
       </svg>`
         : "";
-    const labelX = opts.showIcons ? 'x="25"' : "";
-    return `
-    <g class="stagger" style="animation-delay: ${stagger}ms" transform="translate(25, 0)">
+    return `<g class="stat-row" style="animation-delay: ${delay}ms" transform="translate(25, ${y})">
       ${iconSvg}
-      <text class="stat bold" ${labelX} y="12.5">${opts.label}:</text>
-      <text class="stat bold" x="${opts.showIcons ? 140 : 120}" y="12.5">${displayValue}</text>
+      <text class="stat-label" ${showIcons ? 'x="24"' : ""} y="12.5">${label}:</text>
+      <text class="stat-value" y="12.5">${value}</text>
     </g>`;
-}
-function circleProgress(value) {
-    const radius = 40;
-    const c = Math.PI * (radius * 2);
-    const v = Math.max(0, Math.min(100, value));
-    return ((100 - v) / 100) * c;
 }
 function renderStatsCard(stats, theme, options) {
     const rank = (0, rank_1.calculateRank)({
@@ -25920,82 +25942,65 @@ function renderStatsCard(stats, theme, options) {
         stars: stats.totalStars,
         followers: stats.followers,
     });
+    const values = {
+        stars: stats.totalStars,
+        commits: stats.totalCommits,
+        prs: stats.totalPRs,
+        issues: stats.totalIssues,
+        contribs: stats.contributedTo,
+    };
+    const showRank = !options.hideRank;
+    const cardWidth = showRank ? 450 : 340;
     const lineHeight = 25;
-    const statItems = [
-        {
-            icon: icons_1.icons.star,
-            label: "Total Stars",
-            value: stats.totalStars,
-        },
-        {
-            icon: icons_1.icons.commits,
-            label: "Total Commits",
-            value: stats.totalCommits,
-        },
-        {
-            icon: icons_1.icons.prs,
-            label: "Total PRs",
-            value: stats.totalPRs,
-        },
-        {
-            icon: icons_1.icons.issues,
-            label: "Total Issues",
-            value: stats.totalIssues,
-        },
-        {
-            icon: icons_1.icons.contribs,
-            label: "Contributed to",
-            value: stats.contributedTo,
-        },
-    ];
-    const textNodes = statItems
-        .map((item, i) => createTextNode({
-        ...item,
-        index: i,
-        showIcons: options.showIcons,
-        textColor: theme.text_color,
-        iconColor: theme.icon_color,
-    }))
-        .join("\n");
-    const cardWidth = options.hideRank ? 340 : 450;
-    let cardHeight = Math.max(45 + (statItems.length + 1) * lineHeight, 150);
+    const statCount = STAT_ITEMS.length;
+    const bodyHeight = statCount * lineHeight;
+    const cardHeight = Math.max(bodyHeight + 75, 150);
     const progress = 100 - rank.percentile;
+    const circumference = 2 * Math.PI * 40;
+    const progressOffset = ((100 - progress) / 100) * circumference;
     const css = `
-    .stat {
-      font: 600 14px 'Segoe UI', Ubuntu, Sans-Serif;
+    .stat-label {
+      font: 400 14px 'Segoe UI', Ubuntu, Sans-Serif;
       fill: #${theme.text_color};
     }
-    .stagger {
-      opacity: 0;
-      animation: fadeIn 0.3s ease-in-out forwards;
+    .stat-value {
+      font: 700 14px 'Segoe UI', Ubuntu, Sans-Serif;
+      fill: #${theme.text_color};
     }
-    .bold { font-weight: 700; }
-    .icon { fill: #${theme.icon_color}; display: ${options.showIcons ? "block" : "none"}; }
-    .rank-circle-rim {
+    .stat-icon {
+      y: -1;
+    }
+    .stat-row {
+      opacity: 0;
+      animation: slideUp 0.4s ease-in-out forwards;
+    }
+    .rank-circle-bg {
       stroke: #${theme.ring_color};
       fill: none;
       stroke-width: 6;
-      opacity: 0.2;
+      opacity: 0.15;
     }
     .rank-circle {
       stroke: #${theme.ring_color};
-      stroke-dasharray: 250;
+      stroke-dasharray: ${circumference};
+      stroke-dashoffset: ${circumference};
       fill: none;
       stroke-width: 6;
       stroke-linecap: round;
-      opacity: 0.8;
-      transform-origin: -10px 8px;
+      transform-origin: 50% 50%;
       transform: rotate(-90deg);
-      animation: rankAnim 1s forwards ease-in-out;
+      --progress-offset: ${progressOffset};
+      animation: rankAnim 1s 0.5s ease-in-out forwards;
     }
-    .rank-text {
-      font: 800 24px 'Segoe UI', Ubuntu, Sans-Serif;
+    .rank-label {
+      font: 600 12px 'Segoe UI', Ubuntu, Sans-Serif;
       fill: #${theme.text_color};
-      animation: scaleIn 0.3s ease-in-out forwards;
+      opacity: 0.6;
     }
-    @keyframes rankAnim {
-      from { stroke-dashoffset: ${circleProgress(0)}; }
-      to { stroke-dashoffset: ${circleProgress(progress)}; }
+    .rank-level {
+      font: 800 28px 'Segoe UI', Ubuntu, Sans-Serif;
+      fill: #${theme.text_color};
+      animation: scaleIn 0.4s ease-in-out forwards;
     }
   `;
     const card = new card_1.Card({
@@ -26008,21 +26013,27 @@ function renderStatsCard(stats, theme, options) {
             bgColor: theme.bg_color,
             borderColor: theme.border_color,
         },
-        title: `${stats.name}'s GitHub Stats`,
+        title: `${encodeHTML(stats.name)}'s GitHub Stats`,
     });
     card.setCSS(css);
-    const rankCircle = options.hideRank
-        ? ""
-        : `<g transform="translate(${cardWidth - 70}, ${cardHeight / 2 - 50})">
-        <circle class="rank-circle-rim" cx="-10" cy="8" r="40" />
-        <circle class="rank-circle" cx="-10" cy="8" r="40" />
-        <text class="rank-text" x="-5" y="15" text-anchor="middle">${rank.level}</text>
-      </g>`;
+    const statRows = STAT_ITEMS.map((item, i) => statRow(item.icon, item.label, kFormatter(values[item.key]), i, options.showIcons, theme.text_color, theme.icon_color)).join("\n");
+    const valueX = options.showIcons ? 155 : 130;
+    const rankCircle = showRank
+        ? `<g transform="translate(${cardWidth - 80}, ${(cardHeight - 100) / 2})">
+        <circle class="rank-circle-bg" cx="40" cy="40" r="40" />
+        <circle class="rank-circle" cx="40" cy="40" r="40" />
+        <text class="rank-label" x="40" y="28" text-anchor="middle">RANK</text>
+        <text class="rank-level" x="40" y="56" text-anchor="middle">${rank.level}</text>
+      </g>`
+        : "";
     return card.render(`
     ${rankCircle}
-    <svg x="0" y="0">
-      ${textNodes}
-    </svg>
+    <g>
+      ${statRows}
+    </g>
+    <style>
+      .stat-value { x: ${valueX}; }
+    </style>
   `);
 }
 
@@ -26042,8 +26053,8 @@ function renderTopLangsCard(data, theme, options) {
     const totalSize = langs.reduce((s, l) => s + l.size, 0);
     const cardWidth = 400;
     const barHeight = 8;
-    const lineHeight = 35;
-    const cardHeight = 45 + langs.length * lineHeight + 40;
+    const lineHeight = 36;
+    const cardHeight = 45 + langs.length * lineHeight + 25;
     const css = `
     .lang-name {
       font: 600 13px 'Segoe UI', Ubuntu, Sans-Serif;
@@ -26053,9 +26064,15 @@ function renderTopLangsCard(data, theme, options) {
       font: 600 13px 'Segoe UI', Ubuntu, Sans-Serif;
       fill: #${theme.text_color};
     }
-    .stagger {
+    .lang-row {
       opacity: 0;
-      animation: fadeIn 0.3s ease-in-out forwards;
+      animation: slideUp 0.4s ease-in-out forwards;
+    }
+    .bar-bg {
+      rx: 4;
+    }
+    .bar-fill {
+      rx: 4;
     }
   `;
     const card = new card_1.Card({
@@ -26071,27 +26088,28 @@ function renderTopLangsCard(data, theme, options) {
         title: "Most Used Languages",
     });
     card.setCSS(css);
+    const barWidth = cardWidth - 50;
     const langRows = langs
         .map((lang, i) => {
-        const percent = totalSize > 0 ? ((lang.size / totalSize) * 100).toFixed(1) : "0";
+        const percent = totalSize > 0 ? ((lang.size / totalSize) * 100).toFixed(1) : "0.0";
         const y = i * lineHeight;
-        const barWidth = totalSize > 0 ? (lang.size / totalSize) * (cardWidth - 50) : 0;
-        return `
-        <g class="stagger" style="animation-delay: ${(i + 3) * 150}ms" transform="translate(25, ${y})">
-          <circle cx="5" cy="8" r="5" fill="${lang.color}" />
-          <text class="lang-name" x="18" y="12">${lang.name}</text>
-          <text class="lang-percent" x="${cardWidth - 75}" y="12">${percent}%</text>
-        </g>
-        <g transform="translate(25, ${y + 18})">
-          <rect width="${cardWidth - 50}" height="${barHeight}" rx="5" fill="#${theme.border_color}" />
-          <rect width="${barWidth}" height="${barHeight}" rx="5" fill="${lang.color}" />
+        const fillWidth = totalSize > 0 ? (lang.size / totalSize) * barWidth : 0;
+        const delay = (i + 1) * 150;
+        return `<g class="lang-row" style="animation-delay: ${delay}ms">
+          <circle cx="35" cy="${y + 12}" r="5" fill="${lang.color}" />
+          <text class="lang-name" x="48" y="${y + 16}">${lang.name}</text>
+          <text class="lang-percent" x="${cardWidth - 75}" y="${y + 16}">${percent}%</text>
+          <rect class="bar-bg" x="25" y="${y + 24}" width="${barWidth}" height="${barHeight}" fill="#${theme.border_color}" />
+          <rect class="bar-fill" x="25" y="${y + 24}" width="${fillWidth}" height="${barHeight}" fill="${lang.color}">
+            <animate attributeName="width" from="0" to="${fillWidth}" dur="0.6s" begin="${delay}ms" fill="freeze" />
+          </rect>
         </g>`;
     })
         .join("\n");
     return card.render(`
-    <svg x="0" y="0">
+    <g>
       ${langRows}
-    </svg>
+    </g>
   `);
 }
 

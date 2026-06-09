@@ -5,41 +5,48 @@ import { icons } from "../icons";
 import { Theme } from "../themes";
 
 function kFormatter(n: number): string {
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
   if (n >= 1000) return (n / 1000).toFixed(1) + "k";
   return n.toString();
 }
 
-function createTextNode(opts: {
-  icon: string;
-  label: string;
-  value: number | string;
-  index: number;
-  showIcons: boolean;
-  textColor: string;
-  iconColor: string;
-}): string {
-  const stagger = (opts.index + 3) * 150;
-  const displayValue = typeof opts.value === "number" ? kFormatter(opts.value) : opts.value;
-  const iconSvg = opts.showIcons
-    ? `<svg data-testid="icon" class="icon" viewBox="0 0 16 16" width="16" height="16" fill="#${opts.iconColor}">
-        ${opts.icon}
-      </svg>`
-    : "";
-  const labelX = opts.showIcons ? 'x="25"' : "";
-
-  return `
-    <g class="stagger" style="animation-delay: ${stagger}ms" transform="translate(25, 0)">
-      ${iconSvg}
-      <text class="stat bold" ${labelX} y="12.5">${opts.label}:</text>
-      <text class="stat bold" x="${opts.showIcons ? 140 : 120}" y="12.5">${displayValue}</text>
-    </g>`;
+function encodeHTML(str: string): string {
+  return str.replace(/[\u00A0-\u9999<>&](?!#)/gim, (i) => {
+    return "&#" + i.charCodeAt(0) + ";";
+  });
 }
 
-function circleProgress(value: number): number {
-  const radius = 40;
-  const c = Math.PI * (radius * 2);
-  const v = Math.max(0, Math.min(100, value));
-  return ((100 - v) / 100) * c;
+const STAT_ITEMS = [
+  { key: "stars", icon: icons.star, label: "Total Stars" },
+  { key: "commits", icon: icons.commits, label: "Total Commits" },
+  { key: "prs", icon: icons.prs, label: "Total PRs" },
+  { key: "issues", icon: icons.issues, label: "Total Issues" },
+  { key: "contribs", icon: icons.contribs, label: "Contributed to" },
+] as const;
+
+function statRow(
+  icon: string,
+  label: string,
+  value: string,
+  index: number,
+  showIcons: boolean,
+  textColor: string,
+  iconColor: string,
+): string {
+  const delay = (index + 1) * 150;
+  const y = index * 25;
+
+  const iconSvg = showIcons
+    ? `<svg class="stat-icon" viewBox="0 0 16 16" width="16" height="16" fill="#${iconColor}">
+        ${icon}
+      </svg>`
+    : "";
+
+  return `<g class="stat-row" style="animation-delay: ${delay}ms" transform="translate(25, ${y})">
+      ${iconSvg}
+      <text class="stat-label" ${showIcons ? 'x="24"' : ""} y="12.5">${label}:</text>
+      <text class="stat-value" y="12.5">${value}</text>
+    </g>`;
 }
 
 export function renderStatsCard(
@@ -62,87 +69,67 @@ export function renderStatsCard(
     followers: stats.followers,
   });
 
+  const values: Record<string, number> = {
+    stars: stats.totalStars,
+    commits: stats.totalCommits,
+    prs: stats.totalPRs,
+    issues: stats.totalIssues,
+    contribs: stats.contributedTo,
+  };
+
+  const showRank = !options.hideRank;
+  const cardWidth = showRank ? 450 : 340;
   const lineHeight = 25;
-  const statItems = [
-    {
-      icon: icons.star,
-      label: "Total Stars",
-      value: stats.totalStars,
-    },
-    {
-      icon: icons.commits,
-      label: "Total Commits",
-      value: stats.totalCommits,
-    },
-    {
-      icon: icons.prs,
-      label: "Total PRs",
-      value: stats.totalPRs,
-    },
-    {
-      icon: icons.issues,
-      label: "Total Issues",
-      value: stats.totalIssues,
-    },
-    {
-      icon: icons.contribs,
-      label: "Contributed to",
-      value: stats.contributedTo,
-    },
-  ];
-
-  const textNodes = statItems
-    .map((item, i) =>
-      createTextNode({
-        ...item,
-        index: i,
-        showIcons: options.showIcons,
-        textColor: theme.text_color,
-        iconColor: theme.icon_color,
-      }),
-    )
-    .join("\n");
-
-  const cardWidth = options.hideRank ? 340 : 450;
-  let cardHeight = Math.max(45 + (statItems.length + 1) * lineHeight, 150);
+  const statCount = STAT_ITEMS.length;
+  const bodyHeight = statCount * lineHeight;
+  const cardHeight = Math.max(bodyHeight + 75, 150);
   const progress = 100 - rank.percentile;
+  const circumference = 2 * Math.PI * 40;
+  const progressOffset = ((100 - progress) / 100) * circumference;
 
   const css = `
-    .stat {
-      font: 600 14px 'Segoe UI', Ubuntu, Sans-Serif;
+    .stat-label {
+      font: 400 14px 'Segoe UI', Ubuntu, Sans-Serif;
       fill: #${theme.text_color};
     }
-    .stagger {
-      opacity: 0;
-      animation: fadeIn 0.3s ease-in-out forwards;
+    .stat-value {
+      font: 700 14px 'Segoe UI', Ubuntu, Sans-Serif;
+      fill: #${theme.text_color};
     }
-    .bold { font-weight: 700; }
-    .icon { fill: #${theme.icon_color}; display: ${options.showIcons ? "block" : "none"}; }
-    .rank-circle-rim {
+    .stat-icon {
+      y: -1;
+    }
+    .stat-row {
+      opacity: 0;
+      animation: slideUp 0.4s ease-in-out forwards;
+    }
+    .rank-circle-bg {
       stroke: #${theme.ring_color};
       fill: none;
       stroke-width: 6;
-      opacity: 0.2;
+      opacity: 0.15;
     }
     .rank-circle {
       stroke: #${theme.ring_color};
-      stroke-dasharray: 250;
+      stroke-dasharray: ${circumference};
+      stroke-dashoffset: ${circumference};
       fill: none;
       stroke-width: 6;
       stroke-linecap: round;
-      opacity: 0.8;
-      transform-origin: -10px 8px;
+      transform-origin: 50% 50%;
       transform: rotate(-90deg);
-      animation: rankAnim 1s forwards ease-in-out;
+      --progress-offset: ${progressOffset};
+      animation: rankAnim 1s 0.5s ease-in-out forwards;
     }
-    .rank-text {
-      font: 800 24px 'Segoe UI', Ubuntu, Sans-Serif;
+    .rank-label {
+      font: 600 12px 'Segoe UI', Ubuntu, Sans-Serif;
       fill: #${theme.text_color};
-      animation: scaleIn 0.3s ease-in-out forwards;
+      opacity: 0.6;
     }
-    @keyframes rankAnim {
-      from { stroke-dashoffset: ${circleProgress(0)}; }
-      to { stroke-dashoffset: ${circleProgress(progress)}; }
+    .rank-level {
+      font: 800 28px 'Segoe UI', Ubuntu, Sans-Serif;
+      fill: #${theme.text_color};
+      animation: scaleIn 0.4s ease-in-out forwards;
     }
   `;
 
@@ -156,23 +143,40 @@ export function renderStatsCard(
       bgColor: theme.bg_color,
       borderColor: theme.border_color,
     },
-    title: `${stats.name}'s GitHub Stats`,
+    title: `${encodeHTML(stats.name)}'s GitHub Stats`,
   });
-
   card.setCSS(css);
 
-  const rankCircle = options.hideRank
-    ? ""
-    : `<g transform="translate(${cardWidth - 70}, ${cardHeight / 2 - 50})">
-        <circle class="rank-circle-rim" cx="-10" cy="8" r="40" />
-        <circle class="rank-circle" cx="-10" cy="8" r="40" />
-        <text class="rank-text" x="-5" y="15" text-anchor="middle">${rank.level}</text>
-      </g>`;
+  const statRows = STAT_ITEMS.map((item, i) =>
+    statRow(
+      item.icon,
+      item.label,
+      kFormatter(values[item.key]),
+      i,
+      options.showIcons,
+      theme.text_color,
+      theme.icon_color,
+    ),
+  ).join("\n");
+
+  const valueX = options.showIcons ? 155 : 130;
+
+  const rankCircle = showRank
+    ? `<g transform="translate(${cardWidth - 80}, ${(cardHeight - 100) / 2})">
+        <circle class="rank-circle-bg" cx="40" cy="40" r="40" />
+        <circle class="rank-circle" cx="40" cy="40" r="40" />
+        <text class="rank-label" x="40" y="28" text-anchor="middle">RANK</text>
+        <text class="rank-level" x="40" y="56" text-anchor="middle">${rank.level}</text>
+      </g>`
+    : "";
 
   return card.render(`
     ${rankCircle}
-    <svg x="0" y="0">
-      ${textNodes}
-    </svg>
+    <g>
+      ${statRows}
+    </g>
+    <style>
+      .stat-value { x: ${valueX}; }
+    </style>
   `);
 }
