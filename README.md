@@ -4,10 +4,11 @@ A GitHub Action that generates SVG stats cards from GitHub commit history and pu
 
 ## Features
 
-- **3 card types**: Stats card, Top Languages card, Contribution heatmap graph
+- **3 card types**: Stats card (Impact/Activity split), Top Languages card, Contribution heatmap
 - **10 themes**: default, dark, radical, gruvbox, tokyonight, onedark, dracula, monokai, nord, highcontrast
-- **Self-contained**: No external API services required — runs entirely inside the Action
+- **Self-contained**: No external API services — runs entirely inside the Action
 - **Auto-detects user**: Defaults to the repository owner
+- **Static SVG**: No animations or CSS — renders consistently everywhere
 
 ## Quick Start
 
@@ -16,8 +17,8 @@ name: Update GitHub Stats
 
 on:
   schedule:
-    - cron: "0 0 * * *" # Runs daily at midnight UTC
-  workflow_dispatch: # Allow manual trigger
+    - cron: "0 0 * * *"
+  workflow_dispatch:
 
 jobs:
   stats:
@@ -43,7 +44,11 @@ Then embed in your README:
 
 ### Stats Card (default)
 
-Shows total commits, PRs, issues, stars, contributions, and a rank circle (S → C).
+Impact/Activity split layout with rank badge in the header:
+
+- **Header**: User name + @username + rank circle (top-right)
+- **IMPACT column**: Stars, Contributions
+- **ACTIVITY column**: Commits, Pull Requests, Issues
 
 ```yaml
 - uses: marttp/github-stats-creator@v1
@@ -75,8 +80,6 @@ Shows a GitHub-style contribution heatmap calendar.
 ```
 
 ## Generate Multiple Cards
-
-You can generate multiple card types in a single workflow:
 
 ```yaml
 jobs:
