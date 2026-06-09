@@ -18,15 +18,28 @@ function encodeHTML(str: string): string {
   });
 }
 
-const STAT_ITEMS = [
-  { key: "stars", icon: icons.star, label: "Stars" },
-  { key: "commits", icon: icons.commits, label: "Commits" },
-  { key: "prs", icon: icons.prs, label: "PRs" },
-  { key: "issues", icon: icons.issues, label: "Issues" },
-  { key: "contribs", icon: icons.contribs, label: "Contributed" },
-] as const;
-
 const ROW_H = 24;
+
+interface Metric {
+  icon: string;
+  value: number;
+  label: string;
+}
+
+function metricRow(
+  m: Metric,
+  x: number,
+  y: number,
+  iconColor: string,
+  textColor: string,
+): string {
+  const icon = `<svg x="${x}" y="${y}" width="14" height="14" viewBox="0 0 16 16" fill="#${iconColor}" opacity="0.7">${m.icon}</svg>`;
+  const numX = x + 20;
+  const labelX = x + 52;
+  return `${icon}
+<text x="${numX}" y="${y + 12}" font-size="14" font-weight="700" font-family="${FONT}" fill="#${textColor}">${kFormatter(m.value)}</text>
+<text x="${labelX}" y="${y + 12}" font-size="12" font-family="${FONT}" fill="#${textColor}" opacity="0.6">${m.label}</text>`;
+}
 
 export function renderStatsCard(
   stats: StatsData,
@@ -48,63 +61,66 @@ export function renderStatsCard(
     followers: stats.followers,
   });
 
-  const values: Record<string, number> = {
-    stars: stats.totalStars,
-    commits: stats.totalCommits,
-    prs: stats.totalPRs,
-    issues: stats.totalIssues,
-    contribs: stats.contributedTo,
-  };
+  const impactMetrics: Metric[] = [
+    { icon: icons.star, value: stats.totalStars, label: "Stars" },
+    { icon: icons.contribs, value: stats.contributedTo, label: "Contribs" },
+  ];
+
+  const activityMetrics: Metric[] = [
+    { icon: icons.commits, value: stats.totalCommits, label: "Commits" },
+    { icon: icons.prs, value: stats.totalPRs, label: "Pull Requests" },
+    { icon: icons.issues, value: stats.totalIssues, label: "Issues" },
+  ];
 
   const showRank = !options.hideRank;
-  const iconX = 0;
-  const labelX = options.showIcons ? 22 : 0;
-  const valueX = 140;
-  const metricsW = valueX + 60;
+  const cardWidth = 480;
+  const p = 24;
 
-  const rankR = 36;
-  const rankBoxW = showRank ? rankR * 2 + 24 : 0;
-  const cardWidth = metricsW + rankBoxW + 24 + 48;
+  const headerH = 44;
+  const sepY = headerH + 4;
+  const sectionLabelY = sepY + 18;
+  const firstRowY = sectionLabelY + 14;
+  const maxRows = Math.max(impactMetrics.length, activityMetrics.length);
+  const bodyH = maxRows * ROW_H;
+  const cardHeight = firstRowY + bodyH + p;
 
-  const bodyH = STAT_ITEMS.length * ROW_H;
-  const cardHeight = bodyH + 90;
+  const leftColX = p;
+  const rightColX = Math.floor(cardWidth / 2) + 10;
 
-  const rows = STAT_ITEMS.map((item, i) => {
-    const y = i * ROW_H;
-    const icon = options.showIcons
-      ? `<svg x="${iconX}" y="${y}" width="14" height="14" viewBox="0 0 16 16" fill="#${theme.icon_color}" opacity="0.8">${icons[item.key === "stars" ? "star" : item.key === "commits" ? "commits" : item.key === "prs" ? "prs" : item.key === "issues" ? "issues" : "contribs"]}</svg>`
-      : "";
-    const dotsX = labelX + 60;
-    const dotsW = valueX - dotsX - 6;
-    return `${icon}<text x="${labelX}" y="${y + 12}" font-size="13" font-family="${FONT}" fill="#${theme.text_color}" opacity="0.7">${item.label}</text><text x="${dotsX}" y="${y + 12}" font-size="13" font-family="${FONT}" fill="#${theme.text_color}" opacity="0.2">${"·".repeat(Math.max(1, Math.floor(dotsW / 6)))}</text><text x="${valueX}" y="${y + 12}" font-size="13" font-weight="700" font-family="${FONT}" fill="#${theme.text_color}">${kFormatter(values[item.key])}</text>`;
-  }).join("\n");
+  const sectionLabelStyle = `font-size="10" font-weight="600" font-family="${FONT}" fill="#${theme.text_color}" opacity="0.35" letter-spacing="1.5"`;
 
-  const rankSvg = showRank
-    ? (() => {
-        const cx = metricsW + 24 + rankR + 12;
-        const cy = bodyH / 2 + 2;
-        const circ = 2 * Math.PI * rankR;
-        const filled = ((100 - rank.percentile) / 100) * circ;
-        return `<circle cx="${cx}" cy="${cy}" r="${rankR}" fill="none" stroke="#${theme.text_color}" stroke-width="5" opacity="0.08"/>
-<circle cx="${cx}" cy="${cy}" r="${rankR}" fill="none" stroke="#${theme.ring_color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${circ - filled}" transform="rotate(-90 ${cx} ${cy})"/>
-<text x="${cx}" y="${cy - 8}" text-anchor="middle" font-size="10" font-weight="600" font-family="${FONT}" fill="#${theme.text_color}" opacity="0.5" letter-spacing="1">RANK</text>
-<text x="${cx}" y="${cy + 14}" text-anchor="middle" font-size="22" font-weight="800" font-family="${FONT}" fill="#${theme.text_color}">${rank.level}</text>`;
-      })()
-    : "";
+  let headerRight = "";
+  if (showRank) {
+    const rankR = 26;
+    const rankCx = cardWidth - p - rankR - 8;
+    const rankCy = 24 + rankR;
+    const circ = 2 * Math.PI * rankR;
+    const filled = ((100 - rank.percentile) / 100) * circ;
+    headerRight = `<circle cx="${rankCx}" cy="${rankCy}" r="${rankR}" fill="none" stroke="#${theme.text_color}" stroke-width="4" opacity="0.06"/>
+<circle cx="${rankCx}" cy="${rankCy}" r="${rankR}" fill="none" stroke="#${theme.ring_color}" stroke-width="4" stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${circ - filled}" transform="rotate(-90 ${rankCx} ${rankCy})"/>
+<text x="${rankCx}" y="${rankCy + 1}" text-anchor="middle" font-size="11" font-weight="600" font-family="${FONT}" fill="#${theme.text_color}" opacity="0.45">RANK</text>
+<text x="${rankCx}" y="${rankCy + 15}" text-anchor="middle" font-size="14" font-weight="800" font-family="${FONT}" fill="#${theme.text_color}">${rank.level}</text>`;
+  }
 
-  const card = new Card({
-    width: cardWidth,
-    height: cardHeight,
-    colors: {
-      titleColor: theme.title_color,
-      textColor: theme.text_color,
-      iconColor: theme.icon_color,
-      bgColor: theme.bg_color,
-      borderColor: theme.border_color,
-    },
-    title: encodeHTML(stats.name),
-    subtitle: `github.com/${stats.name.toLowerCase()}`,
-  });
+  const impactRows = impactMetrics
+    .map((m, i) => metricRow(m, leftColX, firstRowY + i * ROW_H, theme.icon_color, theme.text_color))
+    .join("\n");
 
-  return card.render(`${rows}\n${rankSvg}`);
+  const activityRows = activityMetrics
+    .map((m, i) => metricRow(m, rightColX, firstRowY + i * ROW_H, theme.icon_color, theme.text_color))
+    .join("\n");
+
+  const body = `<text x="${p}" y="${p + 16}" font-size="16" font-weight="600" font-family="${FONT}" fill="#${theme.title_color}">${encodeHTML(stats.name)}</text>
+<text x="${p}" y="${p + 32}" font-size="11" font-family="${FONT}" fill="#${theme.text_color}" opacity="0.4">@${stats.login}</text>
+${headerRight}
+<line x1="${p}" y1="${sepY}" x2="${cardWidth - p}" y2="${sepY}" stroke="#${theme.text_color}" stroke-width="0.5" opacity="0.1"/>
+<text x="${leftColX}" y="${sectionLabelY}" ${sectionLabelStyle}>IMPACT</text>
+<text x="${rightColX}" y="${sectionLabelY}" ${sectionLabelStyle}>ACTIVITY</text>
+${impactRows}
+${activityRows}`;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${cardWidth}" height="${cardHeight}" viewBox="0 0 ${cardWidth} ${cardHeight}" role="img">
+  <rect x="0.5" y="0.5" width="${cardWidth - 1}" height="99%" rx="4.5" fill="#${theme.bg_color}" stroke="#${theme.border_color}"/>
+  ${body}
+</svg>`;
 }

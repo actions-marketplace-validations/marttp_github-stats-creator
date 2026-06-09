@@ -168,6 +168,7 @@ query userInfo($login: String!) {
 
 export interface StatsData {
   name: string;
+  login: string;
   totalCommits: number;
   totalPRs: number;
   totalIssues: number;
@@ -246,6 +247,7 @@ export async function fetchStats(
 
   return {
     name: user.name || user.login,
+    login: user.login,
     totalCommits,
     totalPRs: user.pullRequests.totalCount,
     totalIssues: user.openIssues.totalCount + user.closedIssues.totalCount,
