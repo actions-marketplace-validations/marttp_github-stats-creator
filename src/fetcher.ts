@@ -1,16 +1,18 @@
 import * as https from "https";
 
-interface LanguageNode {
-  name: string;
+interface LanguageEdge {
   size: number;
-  color: string | null;
+  node: {
+    name: string;
+    color: string | null;
+  };
 }
 
 interface RepoNode {
   name: string;
   stargazers: { totalCount: number };
   languages: {
-    nodes: LanguageNode[];
+    edges: LanguageEdge[];
   };
 }
 
@@ -108,10 +110,12 @@ query userInfo($login: String!, $after: String) {
         name
         stargazers { totalCount }
         languages(first: 10, orderBy: {direction: DESC, field: SIZE}) {
-          nodes {
-            name
+          edges {
             size
-            color
+            node {
+              name
+              color
+            }
           }
         }
       }
@@ -249,14 +253,15 @@ export async function fetchTopLangs(
 
   const langMap = new Map<string, { size: number; color: string }>();
   for (const repo of repoNodes) {
-    for (const lang of repo.languages.nodes) {
-      const existing = langMap.get(lang.name);
+    for (const edge of repo.languages.edges) {
+      const name = edge.node.name;
+      const existing = langMap.get(name);
       if (existing) {
-        existing.size += lang.size;
+        existing.size += edge.size;
       } else {
-        langMap.set(lang.name, {
-          size: lang.size,
-          color: lang.color || "#8b949e",
+        langMap.set(name, {
+          size: edge.size,
+          color: edge.node.color || "#8b949e",
         });
       }
     }

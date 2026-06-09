@@ -26192,10 +26192,12 @@ query userInfo($login: String!, $after: String) {
         name
         stargazers { totalCount }
         languages(first: 10, orderBy: {direction: DESC, field: SIZE}) {
-          nodes {
-            name
+          edges {
             size
-            color
+            node {
+              name
+              color
+            }
           }
         }
       }
@@ -26278,15 +26280,16 @@ async function fetchTopLangs(username, token) {
     const repoNodes = await fetchAllRepos(username, token, res);
     const langMap = new Map();
     for (const repo of repoNodes) {
-        for (const lang of repo.languages.nodes) {
-            const existing = langMap.get(lang.name);
+        for (const edge of repo.languages.edges) {
+            const name = edge.node.name;
+            const existing = langMap.get(name);
             if (existing) {
-                existing.size += lang.size;
+                existing.size += edge.size;
             }
             else {
-                langMap.set(lang.name, {
-                    size: lang.size,
-                    color: lang.color || "#8b949e",
+                langMap.set(name, {
+                    size: edge.size,
+                    color: edge.node.color || "#8b949e",
                 });
             }
         }
